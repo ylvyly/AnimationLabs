@@ -1,11 +1,19 @@
+#define GLEW_STATIC
+#define _CRT_SECURE_NO_WARNINGS
 
+#include <windows.h>
+#include <iostream>
+#include <stdlib.h>
 #include <GL/glew.h>
-#include <GL/freeglut.h>
+#include <GL/glut.h>
 
 #include <string> 
 #include <fstream>
-#include <iostream>
 #include <sstream>
+
+#pragma comment(lib, "glew32s.lib")
+#pragma comment(lib, "assimp.lib")
+
 
 // Macro for indexing vertex buffer
 #define BUFFER_OFFSET(i) ((char *)NULL + (i))
@@ -157,7 +165,7 @@ void init()
 			0.0f, 0.0f, 1.0f, 1.0f};
 	
 	// Set up the shaders
-	GLuint shaderProgramID = CompileShaders("Shaders/diffuse.vs", "Shaders/diffuse.ps");
+	GLuint shaderProgramID = CompileShaders("../diffuse.vs", "../diffuse.ps");
 	
 	// Put the vertices and colors into a vertex buffer object
 	generateObjectBuffer(vertices, colors);
@@ -166,28 +174,61 @@ void init()
 	linkCurrentBuffertoShader(shaderProgramID);	
 }
 
-int main(int argc, char** argv){
+
+/***************************************************************
+** initGL function ***
+
+***************************************************************/
+
+void initGL()
+{
+	glClearColor(0.8, 0.8, 0.8, 0.8); //background color
+	glClearDepth(1.0);	//background depth value
+
+
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	gluPerspective(60, 1, 1, 1000);  //setup a perspective projection
+
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+
+	gluLookAt(						//set up camera
+		0.0, 0.0, 5.0,		// eye position
+		0.0, 0.0, 0.0,		// lookat position
+		0.0, 1.0, 0.0		// up direction
+	);
+
+}
+
+void main(){
 
 	// Set up the window
-	glutInit(&argc, argv);
+	//glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_DOUBLE|GLUT_RGB);
     glutInitWindowSize(800, 600);
     glutCreateWindow("Hello Triangle");
+
+	glewInit();
+	initGL();
+
 	// Tell glut where the display function is
 	glutDisplayFunc(display);
 
 	 // A call to glewInit() must be done after glut is initialized!
-    GLenum res = glewInit();
+    /*
+	GLenum res = glewInit();
 	// Check for any errors
     if (res != GLEW_OK) {
       fprintf(stderr, "Error: '%s'\n", glewGetErrorString(res));
       return 1;
     }
+	*/
 	// Set up your objects and shaders
 	init();
 	// Begin infinite event loop
 	glutMainLoop();
-    return 0;
+   // return 0;
 }
 
 
