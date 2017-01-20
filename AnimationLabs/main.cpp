@@ -11,14 +11,243 @@
 #include <fstream>
 #include <sstream>
 
+#include <glm.hpp>
+#include <gtc/matrix_transform.hpp>
+#include <gtc/type_ptr.hpp>
+
 #pragma comment(lib, "glew32s.lib")
 #pragma comment(lib, "assimp.lib")
+
+#include <assimp/Importer.hpp>      // C++ importer interface
+#include <assimp/scene.h>           // Output data structure
+#include <assimp/postprocess.h>     // Post processing flag
 
 
 // Macro for indexing vertex buffer
 #define BUFFER_OFFSET(i) ((char *)NULL + (i))
 
 using namespace std;
+
+GLuint shaderProgramID;
+
+glm::mat4 identityMatrix = glm::mat4(1.0);
+
+float zoom = 2.0f;
+glm::mat4 perspectiveMat = 
+	glm::mat4(
+		1.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 1.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 1.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, zoom
+	);
+
+
+float *vertexArray;
+float *normalArray;
+float *uvArray;
+float *tangentArray;
+
+int numVerts;
+Assimp::Importer importer;
+
+GLfloat* g_vp = NULL; // array of vertex points
+GLfloat* g_vn = NULL; // array of vertex normals
+GLfloat* g_vt = NULL; // array of texture coordinates
+GLfloat* g_vtans = NULL;
+int g_point_count = 0;
+bool loadModel(const char* path)
+{
+	DWORD dwFlags =
+		aiProcess_Triangulate | // triangulate n-polygons
+		aiProcess_ValidateDataStructure |
+		aiProcess_ImproveCacheLocality |
+		aiProcess_RemoveRedundantMaterials |
+		aiProcess_SortByPType |
+		aiProcess_FindDegenerates |
+		aiProcess_FindInvalidData |
+		aiProcess_ConvertToLeftHanded |
+		aiProcess_GenSmoothNormals |
+		aiProcess_CalcTangentSpace |
+		aiProcess_GenUVCoords |
+		aiProcess_FixInfacingNormals |
+		aiProcess_FlipUVs |
+		aiProcess_TransformUVCoords;
+	
+	const aiScene* scene = importer.ReadFile(path, dwFlags);
+
+	if (!scene)
+	{
+		printf("3dModel loading error: '%s'\n", importer.GetErrorString());
+		return false;
+	}
+
+	aiMesh *mesh = scene->mMeshes[0];
+
+	GLfloat* g_vtans = NULL;
+	if (mesh->HasTangentsAndBitangents()) {
+		printf("mesh has tangents and bitangents\n");
+		g_vtans = (GLfloat*)malloc(mesh->mNumFaces * 3 * 3);
+	}
+
+	numVerts = mesh->mNumFaces * 3;
+
+
+	vertexArray = new float[mesh->mNumFaces * 3 * 3];
+	normalArray = new float[mesh->mNumFaces * 3 * 3];
+	uvArray = new float[mesh->mNumFaces * 3 * 2];
+
+	tangentArray = new float[mesh->mNumFaces * 3 * 3];
+
+	for (unsigned int i = 0; i<mesh->mNumFaces; i++)
+	{
+		const aiFace& face = mesh->mFaces[i];
+
+		for (int j = 0; j<3; j++)
+		{
+			aiVector3D uv = mesh->mTextureCoords[0][face.mIndices[j]];
+			memcpy(uvArray, &uv, sizeof(float) * 2);
+			uvArray += 2;
+
+			aiVector3D normal = mesh->mNormals[face.mIndices[j]];
+			memcpy(normalArray, &normal, sizeof(float) * 3);
+			normalArray += 3;
+
+			aiVector3D pos = mesh->mVertices[face.mIndices[j]];
+			memcpy(vertexArray, &pos, sizeof(float) * 3);
+			vertexArray += 3;
+
+			aiVector3D tangent = mesh->mTangents[face.mIndices[j]];
+			memcpy(tangentArray, &tangent, sizeof(float) * 3);
+			tangentArray += 3;
+
+			if (mesh->HasTextureCoords(0)) {
+				//printf_s("has tex coords");
+			}
+			if (mesh->HasTangentsAndBitangents()) {
+				//printf_s("has tangents");
+			}
+		}
+	}
+
+	uvArray -= mesh->mNumFaces * 3 * 2;
+	normalArray -= mesh->mNumFaces * 3 * 3;
+	vertexArray -= mesh->mNumFaces * 3 * 3;
+	tangentArray -= mesh->mNumFaces * 3 * 3;
+
+	g_point_count = mesh->mNumVertices;
+
+	if (mesh->HasPositions()) {
+		printf("mesh has positions\n");
+		g_vp = (GLfloat*)malloc(g_point_count * 3 * sizeof(GLfloat));
+	}
+	if (mesh->HasNormals()) {
+		printf("mesh has normals\n");
+		g_vn = (GLfloat*)malloc(g_point_count * 3 * sizeof(GLfloat));
+	}
+	if (mesh->HasTextureCoords(0)) {
+		printf("mesh has texture coords\n");
+		g_vt = (GLfloat*)malloc(g_point_count * 2 * sizeof(GLfloat));
+	}
+	if (mesh->HasTangentsAndBitangents()) {
+		printf("mesh has tangents\n");
+		g_vtans = (GLfloat*)malloc(g_point_count * 4 * sizeof(GLfloat));
+	}
+
+	for (unsigned int v_i = 0; v_i < mesh->mNumVertices; v_i++) {
+		if (mesh->HasPositions()) {
+			const aiVector3D* vp = &(mesh->mVertices[v_i]);
+			g_vp[v_i * 3] = (GLfloat)vp->x;
+			g_vp[v_i * 3 + 1] = (GLfloat)vp->y;
+			g_vp[v_i * 3 + 2] = (GLfloat)vp->z;
+		}
+		if (mesh->HasNormals()) {
+			const aiVector3D* vn = &(mesh->mNormals[v_i]);
+			g_vn[v_i * 3] = (GLfloat)vn->x;
+			g_vn[v_i * 3 + 1] = (GLfloat)vn->y;
+			g_vn[v_i * 3 + 2] = (GLfloat)vn->z;
+		}
+		if (mesh->HasTextureCoords(0)) {
+			const aiVector3D* vt = &(mesh->mTextureCoords[0][v_i]);
+			g_vt[v_i * 2] = (GLfloat)vt->x;
+			g_vt[v_i * 2 + 1] = (GLfloat)vt->y;
+		}
+		if (mesh->HasTangentsAndBitangents()) {
+			const aiVector3D* tangent = &(mesh->mTangents[v_i]);
+			const aiVector3D* bitangent = &(mesh->mBitangents[v_i]);
+			const aiVector3D* normal = &(mesh->mNormals[v_i]);
+
+			glm::vec3 t(tangent->x, tangent->y, tangent->z);
+			glm::vec3 n(normal->x, normal->y, normal->z);
+			glm::vec3 b(bitangent->x, bitangent->y, bitangent->z);
+
+			glm::vec3 t_i = normalize(t - n * dot(n, t));
+
+			float det = (dot(cross(n, t), b));
+			if (det < 0.0f) {
+				det = -1.0f;
+			}
+			else {
+				det = 1.0f;
+			}
+
+			g_vtans[v_i * 4] = t_i.x;
+			g_vtans[v_i * 4 + 1] = t_i.y;
+			g_vtans[v_i * 4 + 2] = t_i.z;
+			g_vtans[v_i * 4 + 3] = det;
+		}
+	}
+
+	return true;
+}
+
+void renderModel() {
+
+	glPushMatrix(); // save current modelview matrix (mostly saves camera transform)
+	glScalef(4, 4, 4);  //rescale model
+	//glTranslated(xPos, yPos, zPos);	//reposition model
+	//glRotated(rotAngle, 0, 1, 0); //rotate by about y-axis
+	//glRotated(rotAngleVert, 1, 0, 0); //rotate by about x-axis
+
+	glEnable(GL_COLOR_MATERIAL);
+	//glColor3f(red, green, blue);
+
+	glEnableClientState(GL_VERTEX_ARRAY);
+	glEnableClientState(GL_NORMAL_ARRAY);
+	glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+
+	glVertexPointer(3, GL_FLOAT, 0, vertexArray);
+	glNormalPointer(GL_FLOAT, 0, normalArray);
+
+	glClientActiveTexture(GL_TEXTURE0_ARB);
+	glTexCoordPointer(2, GL_FLOAT, 0, uvArray);
+
+	GLint locTangent = glGetAttribLocation(shaderProgramID, "Tangent");
+	glEnableVertexAttribArray(locTangent);
+	glVertexAttribPointerARB(locTangent, 3, GL_FLOAT, GL_FALSE, 0, tangentArray);
+	glBindAttribLocationARB(shaderProgramID, locTangent, "Tangent");
+
+	GLint locNormal = glGetAttribLocation(shaderProgramID, "Normal");
+	glEnableVertexAttribArray(locNormal);
+	glVertexAttribPointerARB(locNormal, 3, GL_FLOAT, GL_FALSE, 0, normalArray);
+	glBindAttribLocationARB(shaderProgramID, locNormal, "Normal");
+
+	GLint locTexcoords = glGetAttribLocation(shaderProgramID, "Texcoords");
+	glEnableVertexAttribArray(locTexcoords);
+	glVertexAttribPointerARB(locTexcoords, 2, GL_FLOAT, GL_FALSE, 0, uvArray);
+	glBindAttribLocationARB(shaderProgramID, locTexcoords, "Texcoords");
+
+	glLinkProgramARB(shaderProgramID);
+
+	glDrawArrays(GL_TRIANGLES, 0, numVerts);
+	glDisableClientState(GL_VERTEX_ARRAY);
+	glDisableClientState(GL_NORMAL_ARRAY);
+	glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+
+	glPopMatrix();
+	glFlush();
+
+
+}
 
 bool LoadFile(const std::string& fileName, std::string& outShader)
 {
@@ -74,7 +303,7 @@ GLuint CompileShaders(const std::string& vsFilename, const std::string& psFilena
 {
 	//Start the process of setting up our shaders by creating a program ID
 	//Note: we will link all the shaders together into this ID
-	GLuint shaderProgramID = glCreateProgram();
+	shaderProgramID = glCreateProgram();
 	if (shaderProgramID == 0) {
 		fprintf(stderr, "Error creating shader program\n");
 		exit(1);
@@ -116,7 +345,7 @@ GLuint CompileShaders(const std::string& vsFilename, const std::string& psFilena
 }
 
 GLuint generateObjectBuffer(GLfloat vertices[], GLfloat colors[]) {
-	GLuint numVertices = 3;
+	GLuint numVertices = 12;
 	// Genderate 1 generic buffer object, called VBO
 	GLuint VBO;
  	glGenBuffers(1, &VBO);
@@ -132,7 +361,7 @@ return VBO;
 }
 
 void linkCurrentBuffertoShader(GLuint shaderProgramID){
-	GLuint numVertices = 3;
+	GLuint numVertices = 12;
 	// find the location of the variables that we will be using in the shader program
 	GLuint positionID = glGetAttribLocation(shaderProgramID, "vPosition");
 	GLuint colorID = glGetAttribLocation(shaderProgramID, "vColor");
@@ -143,27 +372,63 @@ void linkCurrentBuffertoShader(GLuint shaderProgramID){
 	// Similarly, for the color data.
 	glEnableVertexAttribArray(colorID);
 	glVertexAttribPointer(colorID, 4, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(numVertices*3*sizeof(GLfloat)));
+
+	int location = glGetUniformLocationARB(shaderProgramID, "perspectiveMat");
+	
+	glUniformMatrix4fvARB(location, 1 /*only setting 1 matrix*/, false /*transpose?*/, glm::value_ptr(perspectiveMat));
+
 }
 
 void display(){
 
 	glClear(GL_COLOR_BUFFER_BIT);
-	// NB: Make the call to draw the geometry in the currently activated vertex buffer. This is where the GPU starts to work!
-	glDrawArrays(GL_TRIANGLES, 0, 3);
+	// NB: Make the call to draw the geometry in the currently activated vertex buffer. This is where the GPU starts to work!	
+	glDrawArrays(GL_TRIANGLES, 0, 12);
+	//renderModel();
     glutSwapBuffers();
 }
 
 void init()
 {
 	// Create 3 vertices that make up a triangle that fits on the viewport 
-	GLfloat vertices[] = {-1.0f, -1.0f, 0.0f,
-			1.0f, -1.0f, 0.0f,
-			0.0f, 1.0f, 0.0f};
+	GLfloat vertices[] = {
+			-1.0f, -1.2f, 0.0f,
+			1.0f, -1.2f, 0.0f,
+			0.0f, 0.0f, 0.0f,
+
+			0.0f, 0.0f, 0.0f,
+			1.0f, -1.2f, 0.0f,
+			1.0f, 1.2f, 0.0f,
+
+			0.0f, 0.0f, 0.0f,
+			-1.0f, -1.2f, 0.0f,
+			-1.0f, 1.2f, 0.0f,
+
+			0.0f, 0.0f, 0.0f,
+			1.0f, 1.2f, 0.0f,
+			-1.0f, 1.2f, 0.0f
+	};
+
 	// Create a color array that identfies the colors of each vertex (format R, G, B, A)
-	GLfloat colors[] = {0.0f, 1.0f, 0.0f, 1.0f,
+	GLfloat colors[] = {
 			1.0f, 0.0f, 0.0f, 1.0f,
-			0.0f, 0.0f, 1.0f, 1.0f};
-	
+			1.0f, 0.0f, 0.0f, 1.0f,
+			1.0f, 0.0f, 0.0f, 1.0f,
+
+			1.0f, 1.0f, 0.0f, 1.0f,
+			1.0f, 1.0f, 0.0f, 1.0f,
+			1.0f, 1.0f, 0.0f, 1.0f,
+
+			1.0f, 1.0f, 0.0f, 1.0f,
+			1.0f, 1.0f, 0.0f, 1.0f,
+			1.0f, 1.0f, 0.0f, 1.0f,
+
+			1.0f, 0.0f, 0.0f, 1.0f,
+			1.0f, 0.0f, 0.0f, 1.0f,
+			1.0f, 0.0f, 0.0f, 1.0f
+
+	};
+
 	// Set up the shaders
 	GLuint shaderProgramID = CompileShaders("../diffuse.vs", "../diffuse.ps");
 	
@@ -173,12 +438,6 @@ void init()
 	// Link the current buffer to the shader
 	linkCurrentBuffertoShader(shaderProgramID);	
 }
-
-
-/***************************************************************
-** initGL function ***
-
-***************************************************************/
 
 void initGL()
 {
@@ -226,6 +485,9 @@ void main(){
 	*/
 	// Set up your objects and shaders
 	init();
+
+	loadModel("../Rabbit.dae");
+
 	// Begin infinite event loop
 	glutMainLoop();
    // return 0;

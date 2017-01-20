@@ -5,11 +5,20 @@
 // Since our triangle vertices were specified as vec3, we just set W to 1.0.
 
 in vec3 vPosition;
-in vec4 vColor;
+in vec4 vColor; //color from vertex buffer object
+
+in vec2 Texcoords;
+in vec3 Tangent;
+in vec3 Normal;
+
 out vec4 color;
+
+uniform mat4 perspectiveMat;
 
 void main()
 {
-	gl_Position = vec4(vPosition.x, vPosition.y, vPosition.z, 1.0);
+	//vec4 test = identity[0];
+
+	gl_Position = perspectiveMat * vec4(vPosition.x, vPosition.y, vPosition.z, 1.0);
 	color = vColor;
 }
