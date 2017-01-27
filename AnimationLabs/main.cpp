@@ -49,6 +49,10 @@ glm::mat4 ProjectionMatrix;
 glm::mat4 ModelMatrix;
 glm::mat4 MVPmatrix;
 
+double alpha = 90;
+double beta = 90;
+double gamma = 90;
+
 float *vertexArray;
 float *normalArray;
 float *uvArray;
@@ -527,6 +531,7 @@ void linkCurrentBuffertoShader2(GLuint shaderProgramID) {
 	// Similarly, for the color data.
 	//glEnableVertexAttribArray(colorID);
 	//glVertexAttribPointer(colorID, 4, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(numVertices * 3 * sizeof(GLfloat)));
+
 	perspectiveMat +=
 		glm::mat4(
 			0.0f, 0.0f, 0.0f, 0.0f,
@@ -534,7 +539,26 @@ void linkCurrentBuffertoShader2(GLuint shaderProgramID) {
 			0.0f, 0.0f, 0.0f, 0.0f,
 			0.0f, -0.5f, 0.0f, -1.0f
 		);
-	
+	glm::mat4 RotationX = ViewMatrix * ModelMatrix *glm::mat4(
+		1.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, cos(alpha), -sin(alpha), 0.0f,
+		0.0f, sin(alpha), cos(alpha), 0.0f,
+		0.0f, 0.0f, 0.0f, 1.0f
+	);
+	glm::mat4 RotationY = ViewMatrix * ModelMatrix *glm::mat4(
+		cos(beta), 0.0f, sin(beta), 0.0f,
+		0.0f, 1.0f, 0.0f, 0.0f,
+		-sin(beta), 0.0f, cos(beta), 0.0f,
+		0.0f, 0.0f, 0.0f, 1.0f
+	);
+	glm::mat4 RotationZ = ViewMatrix * ModelMatrix *glm::mat4(
+		cos(gamma), -sin(gamma), 0.0f, 0.0f,
+		sin(gamma), cos(gamma), 0.0f, 0.0f,
+		0.0f, 0.0f, 1.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 1.0f
+	);
+
+	MVPmatrix = ProjectionMatrix * RotationZ; // Remember : inverted
 	//glm::mat4 rotMat = glm::eulerAngleYXZ(30, 1, 1);
 	//perspectiveMat += rotMat;
 
@@ -561,7 +585,29 @@ void linkCurrentBuffertoShader2(GLuint shaderProgramID) {
 }
 
 void renderRabbit() {
-
+	/*
+	GLuint MatrixID = glGetUniformLocation(shaderProgramID, "MVP");
+	glm::mat4 RotationX = ViewMatrix * ModelMatrix *glm::mat4(
+		1.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, cos(alpha), -sin(alpha), 0.0f,
+		0.0f, sin(alpha), cos(alpha), 0.0f,
+		0.0f, 0.0f, 0.0f, 1.0f
+	);
+	glm::mat4 RotationY = ViewMatrix * ModelMatrix *glm::mat4(
+		cos(beta), 0.0f, sin(beta), 0.0f,
+		0.0f, 1.0f, 0.0f, 0.0f,
+		-sin(beta), 0.0f, cos(beta), 0.0f,
+		0.0f, 0.0f, 0.0f, 1.0f
+	);
+	glm::mat4 RotationZ = ViewMatrix * ModelMatrix *glm::mat4(
+		cos(gamma), -sin(gamma), 0.0f, 0.0f,
+		sin(gamma), cos(gamma), 0.0f, 0.0f,
+		0.0f, 0.0f, 1.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 1.0f
+	);
+	MVPmatrix = ProjectionMatrix * RotationZ; 
+	glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &MVPmatrix[0][0]);
+	*/
 	//glPushMatrix(); // save current modelview matrix (mostly saves camera transform)
 	glScalef(4, 4, 4);  //rescale model
 
@@ -683,7 +729,37 @@ void initGL()
 
 	MVPmatrix = ProjectionMatrix * ViewMatrix * ModelMatrix; // Remember : inverted !
 }
+/*************************************************************
+** keyboard callback function **
 
+*************************************************************/
+
+void keyboard(unsigned char k, int x, int y)
+{
+	switch (k)
+	{
+	case 'a':
+		alpha += 5;
+		break;
+	case 'd':
+		alpha -= 5;
+		break;
+	case 'w':
+		beta += 5;
+		break;
+	case 's':
+		beta -= 5;
+		break;
+	case 'z':
+		gamma -= 5;
+		break;
+	case 'x':
+		gamma -= 5;
+		break;
+	}
+	
+	glutPostRedisplay();
+}
 void main(){
 
 	// Set up the window
@@ -697,6 +773,7 @@ void main(){
 
 	// Tell glut where the display function is
 	glutDisplayFunc(display);
+	glutKeyboardFunc(keyboard);
 
 	 // A call to glewInit() must be done after glut is initialized!
     /*
