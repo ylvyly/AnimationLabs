@@ -14,6 +14,8 @@
 #include <glm.hpp>
 #include <gtc/matrix_transform.hpp>
 #include <gtc/type_ptr.hpp>
+#include <gtx/euler_angles.hpp>
+#include <gtx/transform.hpp>
 
 #pragma comment(lib, "glew32s.lib")
 #pragma comment(lib, "assimp.lib")
@@ -41,6 +43,11 @@ glm::mat4 perspectiveMat =
 		0.0f, 0.0f, 0.0f, zoom
 	);
 
+glm::mat4 CameraMatrix;
+glm::mat4 ViewMatrix;
+glm::mat4 ProjectionMatrix;
+glm::mat4 ModelMatrix;
+glm::mat4 MVPmatrix;
 
 float *vertexArray;
 float *normalArray;
@@ -49,6 +56,7 @@ float *tangentArray;
 
 int numVerts;
 Assimp::Importer importer;
+GLuint ModelVBO;
 
 GLfloat* g_vp = NULL; // array of vertex points
 GLfloat* g_vn = NULL; // array of vertex normals
@@ -57,6 +65,7 @@ GLfloat* g_vtans = NULL;
 int g_point_count = 0;
 bool loadModel(const char* path)
 {
+
 	DWORD dwFlags =
 		aiProcess_Triangulate | // triangulate n-polygons
 		aiProcess_ValidateDataStructure |
@@ -221,6 +230,11 @@ void renderModel() {
 	glClientActiveTexture(GL_TEXTURE0_ARB);
 	glTexCoordPointer(2, GL_FLOAT, 0, uvArray);
 
+	GLint locVertex = glGetAttribLocation(shaderProgramID, "Vertex");
+	glEnableVertexAttribArray(locVertex);
+	glVertexAttribPointerARB(locVertex, 3, GL_FLOAT, GL_FALSE, 0, vertexArray);
+	glBindAttribLocationARB(shaderProgramID, locVertex, "Vertex");
+
 	GLint locTangent = glGetAttribLocation(shaderProgramID, "Tangent");
 	glEnableVertexAttribArray(locTangent);
 	glVertexAttribPointerARB(locTangent, 3, GL_FLOAT, GL_FALSE, 0, tangentArray);
@@ -345,6 +359,7 @@ GLuint CompileShaders(const std::string& vsFilename, const std::string& psFilena
 }
 
 GLuint generateObjectBuffer(GLfloat vertices[], GLfloat colors[]) {
+	
 	GLuint numVertices = 12;
 	// Genderate 1 generic buffer object, called VBO
 	GLuint VBO;
@@ -358,6 +373,110 @@ GLuint generateObjectBuffer(GLfloat vertices[], GLfloat colors[]) {
 	glBufferSubData (GL_ARRAY_BUFFER, 0, numVertices*3*sizeof(GLfloat), vertices);
 	glBufferSubData (GL_ARRAY_BUFFER, numVertices*3*sizeof(GLfloat), numVertices*4*sizeof(GLfloat), colors);
 return VBO;
+}
+
+GLuint generateObjectBuffer2() {
+
+	GLuint numVertices = numVerts;
+	// Genderate 1 generic buffer object, called VBO
+	GLuint VBO;
+	glGenBuffers(1, &VBO);
+	// In OpenGL, we bind (make active) the handle to a target name and then execute commands on that target
+	// Buffer will contain an array of vertices 
+	glBindBuffer(GL_ARRAY_BUFFER, VBO);
+	// After binding, we now fill our object with data, everything in "Vertices" goes to the GPU
+	glBufferData(GL_ARRAY_BUFFER, numVertices * 3 * sizeof(GLfloat), vertexArray, GL_STATIC_DRAW);
+	// if you have more data besides vertices (e.g., vertex colours or normals), use glBufferSubData to tell the buffer when the vertices array ends and when the colors start
+	if (vertexArray != NULL) {
+		//glBufferSubData(GL_ARRAY_BUFFER, 0, numVertices * 7 * sizeof(GLfloat), vertexArray);
+	}	
+	//printf("vertex array: %i", vertexArray);
+	
+	//glBufferSubData(GL_ARRAY_BUFFER, numVertices * 3 * sizeof(GLfloat), numVertices * 4 * sizeof(GLfloat), colors);
+	return VBO;
+}
+
+GLuint generateModelObjectBuffer() {
+
+	glEnableClientState(GL_VERTEX_ARRAY);
+	glEnableClientState(GL_NORMAL_ARRAY);
+	glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+
+	glVertexPointer(3, GL_FLOAT, 0, vertexArray);
+	glNormalPointer(GL_FLOAT, 0, normalArray);
+
+	glClientActiveTexture(GL_TEXTURE0_ARB);
+	glTexCoordPointer(2, GL_FLOAT, 0, uvArray);
+	
+	GLuint vao;
+	glGenVertexArrays(1, &vao);
+	glBindVertexArray(vao);
+
+	GLuint points_vbo;
+	if (NULL != g_vp) {
+		glGenBuffers(1, &points_vbo);
+		glBindBuffer(GL_ARRAY_BUFFER, points_vbo);
+		glBufferData(
+			GL_ARRAY_BUFFER, 3 * g_point_count * sizeof(GLfloat), g_vp, GL_STATIC_DRAW
+		);
+		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, NULL);
+		glEnableVertexAttribArray(0);
+	}
+
+	GLuint normals_vbo;
+	if (NULL != g_vn) {
+		glGenBuffers(1, &normals_vbo);
+		glBindBuffer(GL_ARRAY_BUFFER, normals_vbo);
+		glBufferData(
+			GL_ARRAY_BUFFER, 3 * g_point_count * sizeof(GLfloat), g_vn, GL_STATIC_DRAW
+		);
+		glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, NULL);
+		glEnableVertexAttribArray(1);
+	}
+
+	GLuint texcoords_vbo;
+	if (NULL != g_vt) {
+		glGenBuffers(1, &texcoords_vbo);
+		glBindBuffer(GL_ARRAY_BUFFER, texcoords_vbo);
+		glBufferData(
+			GL_ARRAY_BUFFER, 2 * g_point_count * sizeof(GLfloat), g_vt, GL_STATIC_DRAW
+		);
+		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 0, NULL);
+		glEnableVertexAttribArray(2);
+	}
+
+	GLuint tangents_vbo;
+	if (NULL != g_vtans) {
+		glGenBuffers(1, &tangents_vbo);
+		glBindBuffer(GL_ARRAY_BUFFER, tangents_vbo);
+		glBufferData(
+			GL_ARRAY_BUFFER,
+			4 * g_point_count * sizeof(GLfloat),
+			g_vtans,
+			GL_STATIC_DRAW
+		);
+		glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, 0, NULL);
+		glEnableVertexAttribArray(3);
+	}
+
+	glBindVertexArray(vao);
+
+	glDisableClientState(GL_VERTEX_ARRAY);
+	glDisableClientState(GL_NORMAL_ARRAY);
+	glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+
+	int location = glGetUniformLocationARB(shaderProgramID, "perspectiveMat");
+	glm::mat4 perspectiveMat2 =
+		glm::mat4(
+			1.0f, 0.0f, 0.0f, 0.0f,
+			0.0f, 1.0f, 0.0f, 0.0f,
+			0.0f, 0.0f, 1.0f, 0.0f,
+			0.0f, -0.5f, 0.0f, 1.0f
+		);
+	perspectiveMat2 = glm::rotate(perspectiveMat2, 4.1f, glm::vec3(0.0f, 1.0f, 0.0f));
+	glUniformMatrix4fvARB(location, 1 /*only setting 1 matrix*/, false /*transpose?*/, glm::value_ptr(perspectiveMat2));
+
+	return points_vbo;
 }
 
 void linkCurrentBuffertoShader(GLuint shaderProgramID){
@@ -377,14 +496,92 @@ void linkCurrentBuffertoShader(GLuint shaderProgramID){
 	
 	glUniformMatrix4fvARB(location, 1 /*only setting 1 matrix*/, false /*transpose?*/, glm::value_ptr(perspectiveMat));
 
+
+	GLint locTangent = glGetAttribLocation(shaderProgramID, "Tangent");
+	glEnableVertexAttribArray(locTangent);
+	glVertexAttribPointerARB(locTangent, 3, GL_FLOAT, GL_FALSE, 0, tangentArray);
+	glBindAttribLocationARB(shaderProgramID, locTangent, "Tangent");
+
+	GLint locNormal = glGetAttribLocation(shaderProgramID, "Normal");
+	glEnableVertexAttribArray(locNormal);
+	glVertexAttribPointerARB(locNormal, 3, GL_FLOAT, GL_FALSE, 0, normalArray);
+	glBindAttribLocationARB(shaderProgramID, locNormal, "Normal");
+
+	GLint locTexcoords = glGetAttribLocation(shaderProgramID, "Texcoords");
+	glEnableVertexAttribArray(locTexcoords);
+	glVertexAttribPointerARB(locTexcoords, 2, GL_FLOAT, GL_FALSE, 0, uvArray);
+	glBindAttribLocationARB(shaderProgramID, locTexcoords, "Texcoords");
+
+}
+
+void linkCurrentBuffertoShader2(GLuint shaderProgramID) {
+	GLuint numVertices = numVerts;
+	// find the location of the variables that we will be using in the shader program
+	GLuint positionID = glGetAttribLocation(shaderProgramID, "vPosition");
+	GLuint colorID = glGetAttribLocation(shaderProgramID, "vColor");
+	GLuint MatrixID = glGetUniformLocation(shaderProgramID, "MVP");
+	// Have to enable this
+	glEnableVertexAttribArray(positionID);
+	// Tell it where to find the position data in the currently active buffer (at index positionID)
+	glVertexAttribPointer(positionID, 3, GL_FLOAT, GL_FALSE, 0, 0);
+	// Similarly, for the color data.
+	//glEnableVertexAttribArray(colorID);
+	//glVertexAttribPointer(colorID, 4, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(numVertices * 3 * sizeof(GLfloat)));
+	perspectiveMat +=
+		glm::mat4(
+			0.0f, 0.0f, 0.0f, 0.0f,
+			0.0f, 0.0f, 0.0f, 0.0f,
+			0.0f, 0.0f, 0.0f, 0.0f,
+			0.0f, -0.5f, 0.0f, -1.0f
+		);
+	
+	//glm::mat4 rotMat = glm::eulerAngleYXZ(30, 1, 1);
+	//perspectiveMat += rotMat;
+
+	int location = glGetUniformLocationARB(shaderProgramID, "perspectiveMat");
+
+	glUniformMatrix4fvARB(location, 1 /*only setting 1 matrix*/, false /*transpose?*/, glm::value_ptr(perspectiveMat));
+	glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &MVPmatrix[0][0]);
+
+	GLint locTangent = glGetAttribLocation(shaderProgramID, "Tangent");
+	glEnableVertexAttribArray(locTangent);
+	glVertexAttribPointerARB(locTangent, 3, GL_FLOAT, GL_FALSE, 0, tangentArray);
+	glBindAttribLocationARB(shaderProgramID, locTangent, "Tangent");
+
+	GLint locNormal = glGetAttribLocation(shaderProgramID, "Normal");
+	glEnableVertexAttribArray(locNormal);
+	glVertexAttribPointerARB(locNormal, 3, GL_FLOAT, GL_FALSE, 0, normalArray);
+	glBindAttribLocationARB(shaderProgramID, locNormal, "Normal");
+
+	GLint locTexcoords = glGetAttribLocation(shaderProgramID, "Texcoords");
+	glEnableVertexAttribArray(locTexcoords);
+	glVertexAttribPointerARB(locTexcoords, 2, GL_FLOAT, GL_FALSE, 0, uvArray);
+	glBindAttribLocationARB(shaderProgramID, locTexcoords, "Texcoords");
+
+}
+
+void renderRabbit() {
+
+	//glPushMatrix(); // save current modelview matrix (mostly saves camera transform)
+	glScalef(4, 4, 4);  //rescale model
+
+	glDrawArrays(GL_TRIANGLES, 0, g_point_count);
+
 }
 
 void display(){
 
 	glClear(GL_COLOR_BUFFER_BIT);
 	// NB: Make the call to draw the geometry in the currently activated vertex buffer. This is where the GPU starts to work!	
-	glDrawArrays(GL_TRIANGLES, 0, 12);
-	//renderModel();
+	//glDrawArrays(GL_TRIANGLES, 0, 12); //for triangles
+	//glClear(GL_COLOR_BUFFER_BIT);
+	generateObjectBuffer2();
+	linkCurrentBuffertoShader2(shaderProgramID);
+	renderRabbit();
+	//glPopMatrix();
+	//glFlush();
+
+
     glutSwapBuffers();
 }
 
@@ -430,13 +627,16 @@ void init()
 	};
 
 	// Set up the shaders
-	GLuint shaderProgramID = CompileShaders("../diffuse.vs", "../diffuse.ps");
-	
+	shaderProgramID = CompileShaders("../diffuse.vs", "../diffuse.ps");
+
 	// Put the vertices and colors into a vertex buffer object
 	generateObjectBuffer(vertices, colors);
+	//generateObjectBuffer2();
 
 	// Link the current buffer to the shader
 	linkCurrentBuffertoShader(shaderProgramID);	
+
+
 }
 
 void initGL()
@@ -458,6 +658,30 @@ void initGL()
 		0.0, 1.0, 0.0		// up direction
 	);
 
+	CameraMatrix = glm::lookAt(			//set up camera
+		glm::vec3(0.0, 0.0, 5.0),		// eye position
+		glm::vec3(0.0, 0.0, 0.0),		// lookat position
+		glm::vec3(0.0, 1.0, 0.0)		// up direction
+	);
+
+	ViewMatrix = glm::lookAt(
+		glm::vec3(4, 2, 3), // Camera is at (4,3,3), in World Space
+		glm::vec3(0, 0, 0), // and looks at the origin
+		glm::vec3(0, 1, 0)  // Head is up (set to 0,-1,0 to look upside-down)
+	);
+
+	ModelMatrix = glm::mat4(1.0f);
+
+	ProjectionMatrix = glm::perspective(
+		glm::radians(30.0f),         // The horizontal Field of View, in degrees : the amount of "zoom". Think "camera lens". Usually between 90° (extra wide) and 30° (quite zoomed in)
+		4.0f / 3.0f, // Aspect Ratio. Depends on the size of your window. Notice that 4/3 == 800/600 == 1280/960, sounds familiar ?
+		0.1f,        // Near clipping plane. Keep as big as possible, or you'll get precision issues.
+		100.0f       // Far clipping plane. Keep as little as possible.
+	);
+	// Or, for an ortho camera :
+	//glm::mat4 Projection = glm::ortho(-10.0f,10.0f,-10.0f,10.0f,0.0f,100.0f); // In world coordinates
+
+	MVPmatrix = ProjectionMatrix * ViewMatrix * ModelMatrix; // Remember : inverted !
 }
 
 void main(){
@@ -483,10 +707,12 @@ void main(){
       return 1;
     }
 	*/
+
+	assert(loadModel("../Rabbit.dae"));
+
+	
 	// Set up your objects and shaders
 	init();
-
-	loadModel("../Rabbit.dae");
 
 	// Begin infinite event loop
 	glutMainLoop();
