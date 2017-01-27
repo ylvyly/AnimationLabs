@@ -49,9 +49,13 @@ glm::mat4 ProjectionMatrix;
 glm::mat4 ModelMatrix;
 glm::mat4 MVPmatrix;
 
-double alpha = 90;
-double beta = 90;
-double gamma = 90;
+glm::mat4 RotationX;
+glm::mat4 RotationY;
+glm::mat4 RotationZ;
+
+int alpha = 0;
+double beta = 0;
+double gamma = 0;
 
 float *vertexArray;
 float *normalArray;
@@ -538,27 +542,10 @@ void linkCurrentBuffertoShader2(GLuint shaderProgramID) {
 			0.0f, 0.0f, 0.0f, 0.0f,
 			0.0f, 0.0f, 0.0f, 0.0f,
 			0.0f, -0.5f, 0.0f, -1.0f
-		);
-	glm::mat4 RotationX = ViewMatrix * ModelMatrix *glm::mat4(
-		1.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, cos(alpha), -sin(alpha), 0.0f,
-		0.0f, sin(alpha), cos(alpha), 0.0f,
-		0.0f, 0.0f, 0.0f, 1.0f
-	);
-	glm::mat4 RotationY = ViewMatrix * ModelMatrix *glm::mat4(
-		cos(beta), 0.0f, sin(beta), 0.0f,
-		0.0f, 1.0f, 0.0f, 0.0f,
-		-sin(beta), 0.0f, cos(beta), 0.0f,
-		0.0f, 0.0f, 0.0f, 1.0f
-	);
-	glm::mat4 RotationZ = ViewMatrix * ModelMatrix *glm::mat4(
-		cos(gamma), -sin(gamma), 0.0f, 0.0f,
-		sin(gamma), cos(gamma), 0.0f, 0.0f,
-		0.0f, 0.0f, 1.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 1.0f
 	);
 
-	MVPmatrix = ProjectionMatrix * RotationZ; // Remember : inverted
+	//MVPmatrix = ProjectionMatrix * RotationX; // Remember : inverted
+	//MVPmatrix = ProjectionMatrix * RotationX;
 	//glm::mat4 rotMat = glm::eulerAngleYXZ(30, 1, 1);
 	//perspectiveMat += rotMat;
 
@@ -739,22 +726,65 @@ void keyboard(unsigned char k, int x, int y)
 	switch (k)
 	{
 	case 'a':
-		alpha += 5;
+		printf("alpha: %i", alpha);
+		alpha += 0.1f;
+		RotationX = ViewMatrix * ModelMatrix *glm::mat4(
+			1.0f, 0.0f, 0.0f, 0.0f,
+			0.0f, cos(alpha), -sin(alpha), 0.0f,
+			0.0f, sin(alpha), cos(alpha), 0.0f,
+			0.0f, 0.0f, 0.0f, 1.0f
+		);
+		MVPmatrix = ProjectionMatrix * RotationX; // Remember : inverted
 		break;
 	case 'd':
-		alpha -= 5;
+		alpha -= 0.1f;
+		RotationX = ViewMatrix * ModelMatrix *glm::mat4(
+			1.0f, 0.0f, 0.0f, 0.0f,
+			0.0f, cos(alpha), -sin(alpha), 0.0f,
+			0.0f, sin(alpha), cos(alpha), 0.0f,
+			0.0f, 0.0f, 0.0f, 1.0f
+		);
+		MVPmatrix = ProjectionMatrix * RotationX; // Remember : inverted
 		break;
 	case 'w':
-		beta += 5;
+		beta += 0.1;
+		RotationY = ViewMatrix * ModelMatrix *glm::mat4(
+			cos(beta), 0.0f, sin(beta), 0.0f,
+			0.0f, 1.0f, 0.0f, 0.0f,
+			-sin(beta), 0.0f, cos(beta), 0.0f,
+			0.0f, 0.0f, 0.0f, 1.0f
+		);
+		MVPmatrix = ProjectionMatrix * RotationY; // Remember : inverted
 		break;
 	case 's':
-		beta -= 5;
+		beta -= 0.1;
+		RotationY = ViewMatrix * ModelMatrix *glm::mat4(
+			cos(beta), 0.0f, sin(beta), 0.0f,
+			0.0f, 1.0f, 0.0f, 0.0f,
+			-sin(beta), 0.0f, cos(beta), 0.0f,
+			0.0f, 0.0f, 0.0f, 1.0f
+		);
+		MVPmatrix = ProjectionMatrix * RotationY; // Remember : inverted
 		break;
 	case 'z':
-		gamma -= 5;
+		gamma -= 0.1;
+		RotationZ = ViewMatrix * ModelMatrix *glm::mat4(
+			cos(gamma), -sin(gamma), 0.0f, 0.0f,
+			sin(gamma), cos(gamma), 0.0f, 0.0f,
+			0.0f, 0.0f, 1.0f, 0.0f,
+			0.0f, 0.0f, 0.0f, 1.0f
+		);
+		MVPmatrix = ProjectionMatrix * RotationZ; // Remember : inverted
 		break;
 	case 'x':
-		gamma -= 5;
+		gamma -= 0.1;
+		RotationZ = ViewMatrix * ModelMatrix *glm::mat4(
+			cos(gamma), -sin(gamma), 0.0f, 0.0f,
+			sin(gamma), cos(gamma), 0.0f, 0.0f,
+			0.0f, 0.0f, 1.0f, 0.0f,
+			0.0f, 0.0f, 0.0f, 1.0f
+		);
+		MVPmatrix = ProjectionMatrix * RotationZ; // Remember : inverted
 		break;
 	}
 	
