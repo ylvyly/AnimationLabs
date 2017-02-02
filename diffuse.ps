@@ -1,12 +1,16 @@
 #version 330
-
+uniform sampler2D diffuseTexture; //GL_TEXTURE0
+uniform sampler2D normalTexture; //GL_TEXTURE1 is actually the attributre tex
+uniform sampler2D depthTexture; //GL_TEXTURE2 is actually the normal texture
 // Note: no input in this shader, it just outputs the colour of all fragments, in this case set to red (format: R, G, B, A).
 
 out vec4 FragColor;
 
 in vec4 color;
+in vec2 pos;
 
 void main()
 {
 	FragColor = color;//vec4(1.0, 0.0, 0.0, 1.0);
+	//FragColor = texture2D(diffuseTexture, pos).rgba;
 }

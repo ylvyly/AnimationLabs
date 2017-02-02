@@ -13,6 +13,7 @@ in vec3 vPosition;
 in vec4 vColor; //color from vertex buffer object
 
 out vec4 color;
+out vec2 pos;
 
 uniform mat4 perspectiveMat;
 uniform mat4 MVP;
@@ -24,4 +25,5 @@ void main()
 	gl_Position = perspectiveMat * vec4(vPosition.x, vPosition.y, vPosition.z, 1.0);
 	gl_Position = MVP * vec4(vPosition.x, vPosition.y, vPosition.z, 1.0);
 	color = vec4(vPosition.x, vPosition.y, vPosition.z, 1.0);//vColor;
+	pos = Texcoords;
 }

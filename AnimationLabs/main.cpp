@@ -16,10 +16,13 @@
 #include <gtc/type_ptr.hpp>
 #include <gtx/euler_angles.hpp>
 #include <gtx/transform.hpp>
+#include <gtc/quaternion.hpp> 
+#include <gtx/quaternion.hpp>
 
 #pragma comment(lib, "glew32s.lib")
 #pragma comment(lib, "assimp.lib")
 
+#include "SOIL.h"
 #include <assimp/Importer.hpp>      // C++ importer interface
 #include <assimp/scene.h>           // Output data structure
 #include <assimp/postprocess.h>     // Post processing flag
@@ -49,13 +52,15 @@ glm::mat4 ProjectionMatrix;
 glm::mat4 ModelMatrix;
 glm::mat4 MVPmatrix;
 
+glm::mat4 RotationMatrix;
 glm::mat4 RotationX;
 glm::mat4 RotationY;
 glm::mat4 RotationZ;
 
-int alpha = 0;
+double alpha = 0;
 double beta = 0;
 double gamma = 0;
+glm::quat quaternion;
 
 float *vertexArray;
 float *normalArray;
@@ -71,6 +76,12 @@ GLfloat* g_vn = NULL; // array of vertex normals
 GLfloat* g_vt = NULL; // array of texture coordinates
 GLfloat* g_vtans = NULL;
 int g_point_count = 0;
+
+GLuint tex_diffuse;
+GLuint tex_normal;
+GLuint tex_depth;
+GLuint background;
+
 bool loadModel(const char* path)
 {
 
@@ -238,22 +249,22 @@ void renderModel() {
 	glClientActiveTexture(GL_TEXTURE0_ARB);
 	glTexCoordPointer(2, GL_FLOAT, 0, uvArray);
 
-	GLint locVertex = glGetAttribLocation(shaderProgramID, "Vertex");
+	GLuint locVertex = glGetAttribLocation(shaderProgramID, "Vertex");
 	glEnableVertexAttribArray(locVertex);
 	glVertexAttribPointerARB(locVertex, 3, GL_FLOAT, GL_FALSE, 0, vertexArray);
 	glBindAttribLocationARB(shaderProgramID, locVertex, "Vertex");
 
-	GLint locTangent = glGetAttribLocation(shaderProgramID, "Tangent");
+	GLuint locTangent = glGetAttribLocation(shaderProgramID, "Tangent");
 	glEnableVertexAttribArray(locTangent);
 	glVertexAttribPointerARB(locTangent, 3, GL_FLOAT, GL_FALSE, 0, tangentArray);
 	glBindAttribLocationARB(shaderProgramID, locTangent, "Tangent");
 
-	GLint locNormal = glGetAttribLocation(shaderProgramID, "Normal");
+	GLuint locNormal = glGetAttribLocation(shaderProgramID, "Normal");
 	glEnableVertexAttribArray(locNormal);
 	glVertexAttribPointerARB(locNormal, 3, GL_FLOAT, GL_FALSE, 0, normalArray);
 	glBindAttribLocationARB(shaderProgramID, locNormal, "Normal");
 
-	GLint locTexcoords = glGetAttribLocation(shaderProgramID, "Texcoords");
+	GLuint locTexcoords = glGetAttribLocation(shaderProgramID, "Texcoords");
 	glEnableVertexAttribArray(locTexcoords);
 	glVertexAttribPointerARB(locTexcoords, 2, GL_FLOAT, GL_FALSE, 0, uvArray);
 	glBindAttribLocationARB(shaderProgramID, locTexcoords, "Texcoords");
@@ -505,20 +516,20 @@ void linkCurrentBuffertoShader(GLuint shaderProgramID){
 	glUniformMatrix4fvARB(location, 1 /*only setting 1 matrix*/, false /*transpose?*/, glm::value_ptr(perspectiveMat));
 
 
-	GLint locTangent = glGetAttribLocation(shaderProgramID, "Tangent");
+	GLuint locTangent = glGetAttribLocation(shaderProgramID, "Tangent");
 	glEnableVertexAttribArray(locTangent);
-	glVertexAttribPointerARB(locTangent, 3, GL_FLOAT, GL_FALSE, 0, tangentArray);
-	glBindAttribLocationARB(shaderProgramID, locTangent, "Tangent");
+	glVertexAttribPointer(locTangent, 3, GL_FLOAT, GL_FALSE, 0, tangentArray);
+	glBindAttribLocation(shaderProgramID, locTangent, "Tangent");
 
-	GLint locNormal = glGetAttribLocation(shaderProgramID, "Normal");
+	GLuint locNormal = glGetAttribLocation(shaderProgramID, "Normal");
 	glEnableVertexAttribArray(locNormal);
-	glVertexAttribPointerARB(locNormal, 3, GL_FLOAT, GL_FALSE, 0, normalArray);
-	glBindAttribLocationARB(shaderProgramID, locNormal, "Normal");
+	glVertexAttribPointer(locNormal, 3, GL_FLOAT, GL_FALSE, 0, normalArray);
+	glBindAttribLocation(shaderProgramID, locNormal, "Normal");
 
-	GLint locTexcoords = glGetAttribLocation(shaderProgramID, "Texcoords");
+	GLuint locTexcoords = glGetAttribLocation(shaderProgramID, "Texcoords");
 	glEnableVertexAttribArray(locTexcoords);
-	glVertexAttribPointerARB(locTexcoords, 2, GL_FLOAT, GL_FALSE, 0, uvArray);
-	glBindAttribLocationARB(shaderProgramID, locTexcoords, "Texcoords");
+	glVertexAttribPointer(locTexcoords, 2, GL_FLOAT, GL_FALSE, 0, uvArray);
+	glBindAttribLocation(shaderProgramID, locTexcoords, "Texcoords");
 
 }
 
@@ -544,11 +555,6 @@ void linkCurrentBuffertoShader2(GLuint shaderProgramID) {
 			0.0f, -0.5f, 0.0f, -1.0f
 	);
 
-	//MVPmatrix = ProjectionMatrix * RotationX; // Remember : inverted
-	//MVPmatrix = ProjectionMatrix * RotationX;
-	//glm::mat4 rotMat = glm::eulerAngleYXZ(30, 1, 1);
-	//perspectiveMat += rotMat;
-
 	int location = glGetUniformLocationARB(shaderProgramID, "perspectiveMat");
 
 	glUniformMatrix4fvARB(location, 1 /*only setting 1 matrix*/, false /*transpose?*/, glm::value_ptr(perspectiveMat));
@@ -556,50 +562,26 @@ void linkCurrentBuffertoShader2(GLuint shaderProgramID) {
 
 	GLint locTangent = glGetAttribLocation(shaderProgramID, "Tangent");
 	glEnableVertexAttribArray(locTangent);
-	glVertexAttribPointerARB(locTangent, 3, GL_FLOAT, GL_FALSE, 0, tangentArray);
-	glBindAttribLocationARB(shaderProgramID, locTangent, "Tangent");
+	glVertexAttribPointer(locTangent, 3, GL_FLOAT, GL_FALSE, 0, tangentArray);
+	glBindAttribLocation(shaderProgramID, locTangent, "Tangent");
 
 	GLint locNormal = glGetAttribLocation(shaderProgramID, "Normal");
 	glEnableVertexAttribArray(locNormal);
-	glVertexAttribPointerARB(locNormal, 3, GL_FLOAT, GL_FALSE, 0, normalArray);
-	glBindAttribLocationARB(shaderProgramID, locNormal, "Normal");
+	glVertexAttribPointer(locNormal, 3, GL_FLOAT, GL_FALSE, 0, normalArray);
+	glBindAttribLocation(shaderProgramID, locNormal, "Normal");
 
 	GLint locTexcoords = glGetAttribLocation(shaderProgramID, "Texcoords");
 	glEnableVertexAttribArray(locTexcoords);
-	glVertexAttribPointerARB(locTexcoords, 2, GL_FLOAT, GL_FALSE, 0, uvArray);
-	glBindAttribLocationARB(shaderProgramID, locTexcoords, "Texcoords");
+	glVertexAttribPointer(locTexcoords, 2, GL_FLOAT, GL_FALSE, 0, uvArray);
+	glBindAttribLocation(shaderProgramID, locTexcoords, "Texcoords");
 
 }
 
 void renderRabbit() {
-	/*
-	GLuint MatrixID = glGetUniformLocation(shaderProgramID, "MVP");
-	glm::mat4 RotationX = ViewMatrix * ModelMatrix *glm::mat4(
-		1.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, cos(alpha), -sin(alpha), 0.0f,
-		0.0f, sin(alpha), cos(alpha), 0.0f,
-		0.0f, 0.0f, 0.0f, 1.0f
-	);
-	glm::mat4 RotationY = ViewMatrix * ModelMatrix *glm::mat4(
-		cos(beta), 0.0f, sin(beta), 0.0f,
-		0.0f, 1.0f, 0.0f, 0.0f,
-		-sin(beta), 0.0f, cos(beta), 0.0f,
-		0.0f, 0.0f, 0.0f, 1.0f
-	);
-	glm::mat4 RotationZ = ViewMatrix * ModelMatrix *glm::mat4(
-		cos(gamma), -sin(gamma), 0.0f, 0.0f,
-		sin(gamma), cos(gamma), 0.0f, 0.0f,
-		0.0f, 0.0f, 1.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 1.0f
-	);
-	MVPmatrix = ProjectionMatrix * RotationZ; 
-	glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &MVPmatrix[0][0]);
-	*/
 	//glPushMatrix(); // save current modelview matrix (mostly saves camera transform)
 	glScalef(4, 4, 4);  //rescale model
 
 	glDrawArrays(GL_TRIANGLES, 0, g_point_count);
-
 }
 
 void display(){
@@ -608,6 +590,16 @@ void display(){
 	// NB: Make the call to draw the geometry in the currently activated vertex buffer. This is where the GPU starts to work!	
 	//glDrawArrays(GL_TRIANGLES, 0, 12); //for triangles
 	//glClear(GL_COLOR_BUFFER_BIT);
+	
+	/* For Euler angle rotation
+	RotationMatrix = RotationX * RotationY * RotationZ;
+	*/
+
+	quaternion = glm::quat(glm::vec3(alpha, beta, gamma));
+	RotationMatrix = glm::toMat4(quaternion);
+
+	MVPmatrix = ProjectionMatrix * ViewMatrix * ModelMatrix * RotationMatrix;
+
 	generateObjectBuffer2();
 	linkCurrentBuffertoShader2(shaderProgramID);
 	renderRabbit();
@@ -698,7 +690,7 @@ void initGL()
 	);
 
 	ViewMatrix = glm::lookAt(
-		glm::vec3(4, 2, 3), // Camera is at (4,3,3), in World Space
+		glm::vec3(20, 2, 3), // Camera is at (4,3,3), in World Space
 		glm::vec3(0, 0, 0), // and looks at the origin
 		glm::vec3(0, 1, 0)  // Head is up (set to 0,-1,0 to look upside-down)
 	);
@@ -706,7 +698,7 @@ void initGL()
 	ModelMatrix = glm::mat4(1.0f);
 
 	ProjectionMatrix = glm::perspective(
-		glm::radians(30.0f),         // The horizontal Field of View, in degrees : the amount of "zoom". Think "camera lens". Usually between 90° (extra wide) and 30° (quite zoomed in)
+		glm::radians(90.0f),         // The horizontal Field of View, in degrees : the amount of "zoom". Think "camera lens". Usually between 90° (extra wide) and 30° (quite zoomed in)
 		4.0f / 3.0f, // Aspect Ratio. Depends on the size of your window. Notice that 4/3 == 800/600 == 1280/960, sounds familiar ?
 		0.1f,        // Near clipping plane. Keep as big as possible, or you'll get precision issues.
 		100.0f       // Far clipping plane. Keep as little as possible.
@@ -716,6 +708,73 @@ void initGL()
 
 	MVPmatrix = ProjectionMatrix * ViewMatrix * ModelMatrix; // Remember : inverted !
 }
+
+void loadWithNormalMap(const char *diffuse, const char *normal, const char *depth)
+{
+	GLint DiffuseTextureID = glGetUniformLocation(shaderProgramID, "diffuseTexture");
+	GLint FeatureTextureID = glGetUniformLocation(shaderProgramID, "featureTexture");
+	GLint DepthTextureID = glGetUniformLocation(shaderProgramID, "depthTexture");
+
+	glEnable(GL_TEXTURE_2D);
+	glActiveTexture(GL_TEXTURE0);
+	glUniform1i(DiffuseTextureID, 0);
+	tex_diffuse;
+	glGenTextures(1, &tex_diffuse);
+
+	tex_diffuse = SOIL_load_OGL_texture
+	(
+		diffuse,
+		SOIL_LOAD_AUTO,
+		SOIL_CREATE_NEW_ID,
+		SOIL_FLAG_MIPMAPS | SOIL_FLAG_INVERT_Y | SOIL_FLAG_NTSC_SAFE_RGB | SOIL_FLAG_COMPRESS_TO_DXT
+	);
+	if (0 == tex_diffuse)
+	{
+		printf("SOIL loading error: '%s'\n", SOIL_last_result());
+	}
+	glBindTexture(GL_TEXTURE_2D, tex_diffuse);
+
+	glActiveTexture(GL_TEXTURE1);
+	glUniform1i(FeatureTextureID, 1);
+	tex_normal;
+	glGenTextures(1, &tex_normal);
+
+	tex_normal = SOIL_load_OGL_texture
+	(
+		normal,
+		SOIL_LOAD_AUTO,
+		SOIL_CREATE_NEW_ID,
+		SOIL_FLAG_MIPMAPS | SOIL_FLAG_INVERT_Y | SOIL_FLAG_NTSC_SAFE_RGB | SOIL_FLAG_COMPRESS_TO_DXT
+	);
+	if (0 == tex_normal)
+	{
+		printf("SOIL loading error: '%s'\n", SOIL_last_result());
+	}
+
+	glBindTexture(GL_TEXTURE_2D, tex_normal);
+
+	glActiveTexture(GL_TEXTURE2);
+	glUniform1i(DepthTextureID, 2);
+	tex_depth;
+	glGenTextures(1, &tex_depth);
+
+	tex_depth = SOIL_load_OGL_texture
+	(
+		depth,
+		SOIL_LOAD_AUTO,
+		SOIL_CREATE_NEW_ID,
+		SOIL_FLAG_MIPMAPS | SOIL_FLAG_INVERT_Y | SOIL_FLAG_NTSC_SAFE_RGB | SOIL_FLAG_COMPRESS_TO_DXT
+	);
+	if (0 == tex_depth)
+	{
+		printf("SOIL loading error: '%s'\n", SOIL_last_result());
+	}
+
+	glBindTexture(GL_TEXTURE_2D, tex_depth);
+
+}
+
+
 /*************************************************************
 ** keyboard callback function **
 
@@ -728,68 +787,69 @@ void keyboard(unsigned char k, int x, int y)
 	case 'a':
 		printf("alpha: %i", alpha);
 		alpha += 0.1f;
-		RotationX = ViewMatrix * ModelMatrix *glm::mat4(
+		//pitch rotation
+		RotationX = glm::mat4(
 			1.0f, 0.0f, 0.0f, 0.0f,
 			0.0f, cos(alpha), -sin(alpha), 0.0f,
 			0.0f, sin(alpha), cos(alpha), 0.0f,
 			0.0f, 0.0f, 0.0f, 1.0f
 		);
-		MVPmatrix = ProjectionMatrix * RotationX; // Remember : inverted
 		break;
 	case 'd':
 		alpha -= 0.1f;
-		RotationX = ViewMatrix * ModelMatrix *glm::mat4(
+		// - pitch rotation
+		RotationX = glm::mat4(
 			1.0f, 0.0f, 0.0f, 0.0f,
 			0.0f, cos(alpha), -sin(alpha), 0.0f,
 			0.0f, sin(alpha), cos(alpha), 0.0f,
 			0.0f, 0.0f, 0.0f, 1.0f
 		);
-		MVPmatrix = ProjectionMatrix * RotationX; // Remember : inverted
 		break;
 	case 'w':
 		beta += 0.1;
-		RotationY = ViewMatrix * ModelMatrix *glm::mat4(
+		//yaw rotation
+		RotationY = glm::mat4(
 			cos(beta), 0.0f, sin(beta), 0.0f,
 			0.0f, 1.0f, 0.0f, 0.0f,
 			-sin(beta), 0.0f, cos(beta), 0.0f,
 			0.0f, 0.0f, 0.0f, 1.0f
 		);
-		MVPmatrix = ProjectionMatrix * RotationY; // Remember : inverted
 		break;
 	case 's':
 		beta -= 0.1;
-		RotationY = ViewMatrix * ModelMatrix *glm::mat4(
+		// - yaw rotation
+		RotationY = glm::mat4(
 			cos(beta), 0.0f, sin(beta), 0.0f,
 			0.0f, 1.0f, 0.0f, 0.0f,
 			-sin(beta), 0.0f, cos(beta), 0.0f,
 			0.0f, 0.0f, 0.0f, 1.0f
 		);
-		MVPmatrix = ProjectionMatrix * RotationY; // Remember : inverted
 		break;
 	case 'z':
-		gamma -= 0.1;
-		RotationZ = ViewMatrix * ModelMatrix *glm::mat4(
+		gamma += 0.1;
+		// roll rotation
+		RotationZ = glm::mat4(
 			cos(gamma), -sin(gamma), 0.0f, 0.0f,
 			sin(gamma), cos(gamma), 0.0f, 0.0f,
 			0.0f, 0.0f, 1.0f, 0.0f,
 			0.0f, 0.0f, 0.0f, 1.0f
 		);
-		MVPmatrix = ProjectionMatrix * RotationZ; // Remember : inverted
 		break;
 	case 'x':
 		gamma -= 0.1;
-		RotationZ = ViewMatrix * ModelMatrix *glm::mat4(
+		// - roll rotation
+		RotationZ = glm::mat4(
 			cos(gamma), -sin(gamma), 0.0f, 0.0f,
 			sin(gamma), cos(gamma), 0.0f, 0.0f,
 			0.0f, 0.0f, 1.0f, 0.0f,
 			0.0f, 0.0f, 0.0f, 1.0f
 		);
-		MVPmatrix = ProjectionMatrix * RotationZ; // Remember : inverted
 		break;
 	}
 	
 	glutPostRedisplay();
 }
+
 void main(){
 
 	// Set up the window
@@ -815,8 +875,8 @@ void main(){
     }
 	*/
 
-	assert(loadModel("../Rabbit.dae"));
-
+	assert(loadModel("../biplane_complete.obj"));
+	loadWithNormalMap("../biplano_last.jpg", "../biplano_last.jpg", "../biplano_last.jpg"); //("Textures/lava.jpg", "Textures/lava_normal.jpg");
 	
 	// Set up your objects and shaders
 	init();
