@@ -19,7 +19,15 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Bone.cpp" />
+    <ClCompile Include="Bone2.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="Skeleton.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Bone.h" />
+    <ClInclude Include="Bone2.h" />
+    <ClInclude Include="Skeleton.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{31F7EF73-B716-4A46-B77B-0D1976DBD30E}</ProjectGuid>

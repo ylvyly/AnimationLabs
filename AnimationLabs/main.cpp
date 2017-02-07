@@ -27,6 +27,8 @@
 #include <assimp/scene.h>           // Output data structure
 #include <assimp/postprocess.h>     // Post processing flag
 
+#include "Skeleton.h"
+
 
 // Macro for indexing vertex buffer
 #define BUFFER_OFFSET(i) ((char *)NULL + (i))
@@ -67,9 +69,18 @@ float *normalArray;
 float *uvArray;
 float *tangentArray;
 
+float *vertexArrayPlane;
+float *vertexArrayRabbit;
+
 int numVerts;
+int numVertsPlane;
+int numVertsRabbit;
+
 Assimp::Importer importer;
 GLuint ModelVBO;
+
+GLuint planeVBO;
+GLuint rabbitVBO;
 
 GLfloat* g_vp = NULL; // array of vertex points
 GLfloat* g_vn = NULL; // array of vertex normals
@@ -81,6 +92,14 @@ GLuint tex_diffuse;
 GLuint tex_normal;
 GLuint tex_depth;
 GLuint background;
+
+Skeleton *createSkeleton(Bone *root) {
+
+	Skeleton *skeleton;
+	//skeleton->rootBone = root;
+
+
+}
 
 bool loadModel(const char* path)
 {
@@ -396,106 +415,36 @@ return VBO;
 
 GLuint generateObjectBuffer2() {
 
-	GLuint numVertices = numVerts;
+	GLuint numVertices = numVertsPlane + numVertsRabbit;
 	// Genderate 1 generic buffer object, called VBO
-	GLuint VBO;
-	glGenBuffers(1, &VBO);
+	//planeVBO;
+	glGenBuffers(1, &planeVBO);
 	// In OpenGL, we bind (make active) the handle to a target name and then execute commands on that target
 	// Buffer will contain an array of vertices 
-	glBindBuffer(GL_ARRAY_BUFFER, VBO);
+	glBindBuffer(GL_ARRAY_BUFFER, planeVBO);
 	// After binding, we now fill our object with data, everything in "Vertices" goes to the GPU
-	glBufferData(GL_ARRAY_BUFFER, numVertices * 3 * sizeof(GLfloat), vertexArray, GL_STATIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, numVertices * 7 * sizeof(GLfloat), NULL, GL_STATIC_DRAW);
 	// if you have more data besides vertices (e.g., vertex colours or normals), use glBufferSubData to tell the buffer when the vertices array ends and when the colors start
-	if (vertexArray != NULL) {
-		//glBufferSubData(GL_ARRAY_BUFFER, 0, numVertices * 7 * sizeof(GLfloat), vertexArray);
-	}	
+	
+	glBufferSubData(GL_ARRAY_BUFFER, 0, numVertsPlane * 3 * sizeof(GLfloat), vertexArrayPlane);
+		
 	//printf("vertex array: %i", vertexArray);
 	
-	//glBufferSubData(GL_ARRAY_BUFFER, numVertices * 3 * sizeof(GLfloat), numVertices * 4 * sizeof(GLfloat), colors);
-	return VBO;
+	glBufferSubData(GL_ARRAY_BUFFER, numVertsPlane * 3 * sizeof(GLfloat), numVertsRabbit * 3 * sizeof(GLfloat), vertexArrayRabbit);
+	return planeVBO;
 }
 
-GLuint generateModelObjectBuffer() {
+GLuint generateRabbitBuffer(GLuint verts) {
 
-	glEnableClientState(GL_VERTEX_ARRAY);
-	glEnableClientState(GL_NORMAL_ARRAY);
-	glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+	GLuint numVertices = verts;
+	glGenBuffers(1, &rabbitVBO);
+	// In OpenGL, we bind (make active) the handle to a target name and then execute commands on that target
+	// Buffer will contain an array of vertices 
+	glBindBuffer(GL_ARRAY_BUFFER, rabbitVBO);
+	// After binding, we now fill our object with data, everything in "Vertices" goes to the GPU
+	glBufferData(GL_ARRAY_BUFFER, numVertices * 3 * sizeof(GLfloat), vertexArrayRabbit, GL_STATIC_DRAW);
 
-	glVertexPointer(3, GL_FLOAT, 0, vertexArray);
-	glNormalPointer(GL_FLOAT, 0, normalArray);
-
-	glClientActiveTexture(GL_TEXTURE0_ARB);
-	glTexCoordPointer(2, GL_FLOAT, 0, uvArray);
-	
-	GLuint vao;
-	glGenVertexArrays(1, &vao);
-	glBindVertexArray(vao);
-
-	GLuint points_vbo;
-	if (NULL != g_vp) {
-		glGenBuffers(1, &points_vbo);
-		glBindBuffer(GL_ARRAY_BUFFER, points_vbo);
-		glBufferData(
-			GL_ARRAY_BUFFER, 3 * g_point_count * sizeof(GLfloat), g_vp, GL_STATIC_DRAW
-		);
-		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, NULL);
-		glEnableVertexAttribArray(0);
-	}
-
-	GLuint normals_vbo;
-	if (NULL != g_vn) {
-		glGenBuffers(1, &normals_vbo);
-		glBindBuffer(GL_ARRAY_BUFFER, normals_vbo);
-		glBufferData(
-			GL_ARRAY_BUFFER, 3 * g_point_count * sizeof(GLfloat), g_vn, GL_STATIC_DRAW
-		);
-		glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, NULL);
-		glEnableVertexAttribArray(1);
-	}
-
-	GLuint texcoords_vbo;
-	if (NULL != g_vt) {
-		glGenBuffers(1, &texcoords_vbo);
-		glBindBuffer(GL_ARRAY_BUFFER, texcoords_vbo);
-		glBufferData(
-			GL_ARRAY_BUFFER, 2 * g_point_count * sizeof(GLfloat), g_vt, GL_STATIC_DRAW
-		);
-		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 0, NULL);
-		glEnableVertexAttribArray(2);
-	}
-
-	GLuint tangents_vbo;
-	if (NULL != g_vtans) {
-		glGenBuffers(1, &tangents_vbo);
-		glBindBuffer(GL_ARRAY_BUFFER, tangents_vbo);
-		glBufferData(
-			GL_ARRAY_BUFFER,
-			4 * g_point_count * sizeof(GLfloat),
-			g_vtans,
-			GL_STATIC_DRAW
-		);
-		glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, 0, NULL);
-		glEnableVertexAttribArray(3);
-	}
-
-	glBindVertexArray(vao);
-
-	glDisableClientState(GL_VERTEX_ARRAY);
-	glDisableClientState(GL_NORMAL_ARRAY);
-	glDisableClientState(GL_TEXTURE_COORD_ARRAY);
-
-	int location = glGetUniformLocationARB(shaderProgramID, "perspectiveMat");
-	glm::mat4 perspectiveMat2 =
-		glm::mat4(
-			1.0f, 0.0f, 0.0f, 0.0f,
-			0.0f, 1.0f, 0.0f, 0.0f,
-			0.0f, 0.0f, 1.0f, 0.0f,
-			0.0f, -0.5f, 0.0f, 1.0f
-		);
-	perspectiveMat2 = glm::rotate(perspectiveMat2, 4.1f, glm::vec3(0.0f, 1.0f, 0.0f));
-	glUniformMatrix4fvARB(location, 1 /*only setting 1 matrix*/, false /*transpose?*/, glm::value_ptr(perspectiveMat2));
-
-	return points_vbo;
+	return rabbitVBO;
 }
 
 void linkCurrentBuffertoShader(GLuint shaderProgramID){
@@ -534,7 +483,7 @@ void linkCurrentBuffertoShader(GLuint shaderProgramID){
 }
 
 void linkCurrentBuffertoShader2(GLuint shaderProgramID) {
-	GLuint numVertices = numVerts;
+	GLuint numVertices = numVertsPlane + numVertsRabbit;
 	// find the location of the variables that we will be using in the shader program
 	GLuint positionID = glGetAttribLocation(shaderProgramID, "vPosition");
 	GLuint colorID = glGetAttribLocation(shaderProgramID, "vColor");
@@ -544,8 +493,8 @@ void linkCurrentBuffertoShader2(GLuint shaderProgramID) {
 	// Tell it where to find the position data in the currently active buffer (at index positionID)
 	glVertexAttribPointer(positionID, 3, GL_FLOAT, GL_FALSE, 0, 0);
 	// Similarly, for the color data.
-	//glEnableVertexAttribArray(colorID);
-	//glVertexAttribPointer(colorID, 4, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(numVertices * 3 * sizeof(GLfloat)));
+	glEnableVertexAttribArray(colorID);
+	glVertexAttribPointer(colorID, 3, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(numVertsPlane * 3 * sizeof(GLfloat)));
 
 	perspectiveMat +=
 		glm::mat4(
@@ -581,7 +530,7 @@ void renderRabbit() {
 	//glPushMatrix(); // save current modelview matrix (mostly saves camera transform)
 	glScalef(4, 4, 4);  //rescale model
 
-	glDrawArrays(GL_TRIANGLES, 0, g_point_count);
+	glDrawArrays(GL_TRIANGLES, 0, numVerts);//g_point_count);
 }
 
 void display(){
@@ -600,9 +549,18 @@ void display(){
 
 	MVPmatrix = ProjectionMatrix * ViewMatrix * ModelMatrix * RotationMatrix;
 
-	generateObjectBuffer2();
+	
+	glBindBuffer(GL_ARRAY_BUFFER, planeVBO);
 	linkCurrentBuffertoShader2(shaderProgramID);
 	renderRabbit();
+
+	
+	//glBindBuffer(GL_ARRAY_BUFFER, rabbitVBO);
+	//linkCurrentBuffertoShader2(shaderProgramID, numVertsRabbit);
+	//renderRabbit();
+
+	//assert(loadModel("../Rabbit.obj"));
+
 	//glPopMatrix();
 	//glFlush();
 
@@ -661,6 +619,17 @@ void init()
 	// Link the current buffer to the shader
 	linkCurrentBuffertoShader(shaderProgramID);	
 
+	assert(loadModel("../Rabbit.obj"));
+	numVertsRabbit = numVerts;
+	vertexArrayRabbit = vertexArray;
+	//generateRabbitBuffer(numVertsRabbit);
+
+	assert(loadModel("../biplane_complete.obj"));
+	numVertsPlane = numVerts;
+	vertexArrayPlane = vertexArray;
+	generateObjectBuffer2();
+
+	numVerts = numVertsPlane + numVertsRabbit;
 
 }
 
@@ -875,7 +844,7 @@ void main(){
     }
 	*/
 
-	assert(loadModel("../biplane_complete.obj"));
+	//assert(loadModel("../Rabbit.obj"));
 	loadWithNormalMap("../biplano_last.jpg", "../biplano_last.jpg", "../biplano_last.jpg"); //("Textures/lava.jpg", "Textures/lava_normal.jpg");
 	
 	// Set up your objects and shaders
