@@ -20,7 +20,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Bone.cpp" />
-    <ClCompile Include="Bone2.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Skeleton.cpp" />
   </ItemGroup>

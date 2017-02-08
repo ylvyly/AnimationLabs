@@ -1,4 +1,4 @@
-#pragma once
+//#pragma once
 /*
 #include "Skeleton.h"
 
@@ -31,20 +31,16 @@ void Skeleton::transformBone(Bone movedBone, glm::mat4 transformationMatrix) {
 	}
 
 }
-*/
 #include "Skeleton.h"
 #include "Bone.h"
 
 #define MAX_BONE_COUNT 256
-
-typedef struct Skeleton
-{
-	struct Bone *rootBone;
-	struct Bone *bones[MAX_BONE_COUNT];
-	//list<Bone*> boneList; //= {};
-}; Skeleton;
+*/
 
 
+
+
+/*
 //transform bone and all its children
 void transformBone(Bone *movedBone, glm::mat4 transformationMatrix) {
 
@@ -62,3 +58,4 @@ void transformBone(Bone *movedBone, glm::mat4 transformationMatrix) {
 
 	}
 }
+*/

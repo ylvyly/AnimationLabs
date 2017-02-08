@@ -93,11 +93,12 @@ GLuint tex_normal;
 GLuint tex_depth;
 GLuint background;
 
-Skeleton *createSkeleton(Bone *root) {
 
-	Skeleton *skeleton;
-	//skeleton->rootBone = root;
+Skeleton createSkeleton(Bone *root) {
 
+	Skeleton skeleton = Skeleton();
+	addBone(skeleton, root);
+	return skeleton;
 
 }
 
@@ -847,6 +848,12 @@ void main(){
 	//assert(loadModel("../Rabbit.obj"));
 	loadWithNormalMap("../biplano_last.jpg", "../biplano_last.jpg", "../biplano_last.jpg"); //("Textures/lava.jpg", "Textures/lava_normal.jpg");
 	
+	Bone *testBone = createBone("test", glm::mat4(1.0));
+	boneDumpTree(testBone, 1);
+	Skeleton skeleton = createSkeleton(testBone);
+	//testBone = skeleton.rootBone;
+	//boneDumpTree(testBone, 1);
+
 	// Set up your objects and shaders
 	init();
 

@@ -62,7 +62,8 @@ m_lChildren.push_back(child);
 
 typedef struct Bone
 {
-	char boneName[20];
+	//char boneName[20];
+	string boneName;
 	//Bone *parent;
 	//list<Bone*> lChildren;
 	struct Bone *children[MAX_CHILD_COUNT],
@@ -70,7 +71,24 @@ typedef struct Bone
 	uint8_t childCount;
 	glm::mat4 transform;
 
+	Bone() {}; //: boneName(""), children(), parent(NULL), childCount(0), transform(NULL) {};
+	//Bone(char name[20], Bone *childrenInit[0], Bone *parentBone, uint8_t childNum, glm::mat4 boneTransform) : boneName(""), children(), parent(parentBone), childCount(childNum), transform(boneTransform)
+	//{
+	//};
+
 }; Bone;
+
+
+Bone *createBone(string name, glm::mat4 boneTransform) {
+
+	Bone* newBone = new Bone;
+	newBone->boneName = name;
+	newBone->childCount = 0;
+	newBone->transform = boneTransform;
+
+	return newBone;
+}
+
 
 Bone *addChild(Bone *root, char *childName, glm::mat4 childTransform) {
 
@@ -93,7 +111,7 @@ Bone *addChild(Bone *root, char *childName, glm::mat4 childTransform) {
 		root->children[root->childCount++] = t; /* Increment the childCounter and set the pointer */
 		root = t; /* Change the root */
 
-		strcpy(root->boneName, childName);
+		root->boneName=childName;
 	}
 
 	for (i = 0; i < MAX_CHILD_COUNT; i++)
@@ -114,10 +132,23 @@ void boneDumpTree(Bone *root, uint8_t level)
 	for (i = 0; i < level; i++)
 		printf("#"); /* We print # to signal the level of this bone. */
 
-	printf("%d %d %s\n",
+	//std::cout << "Bone: " << root->boneName;
+	printf(" Child count: %x Bone: %s Transform: %s\n",
 		root->childCount, root->boneName, root->transform);
 
 	/* Recursively call this on my children */
 	for (i = 0; i < root->childCount; i++)
 		boneDumpTree(root->children[i], level + 1);
 }
+
+//transform bone and all its children
+void transformBone(Bone *bone, glm::mat4 transformationMatrix) {
+
+	bone->transform *= transformationMatrix;
+
+	int i;
+	for (i = 0; i < bone->childCount; i++) {
+		transformBone(bone->children[i], transformationMatrix);
+	}
+}
+
