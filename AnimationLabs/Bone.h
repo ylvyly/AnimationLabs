@@ -130,10 +130,10 @@ void boneDumpTree(Bone *root, uint8_t level)
 		return;
 
 	for (i = 0; i < level; i++)
-		printf("#"); /* We print # to signal the level of this bone. */
+		printf("(#"); /* We print # to signal the level of this bone. */
 
 	//std::cout << "Bone: " << root->boneName;
-	printf(" Child count: %x Bone: %s Transform: %s\n",
+	printf(" Child count: %x Bone: %s Transform: %s)\n",
 		root->childCount, root->boneName, root->transform);
 
 	/* Recursively call this on my children */

@@ -41,12 +41,12 @@ glm::mat4 identityMatrix = glm::mat4(1.0);
 
 float zoom = 2.0f;
 glm::mat4 perspectiveMat = 
-	glm::mat4(
-		1.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 1.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 1.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, zoom
-	);
+		glm::mat4(
+			1.0f, 0.0f, 0.0f, 0.0f,
+			0.0f, 1.0f, 0.0f, 0.0f,
+			0.0f, 0.0f, 1.0f, 0.0f,
+			0.0f, 0.0f, 0.0f, zoom
+		);
 
 glm::mat4 CameraMatrix;
 glm::mat4 ViewMatrix;
@@ -58,6 +58,15 @@ glm::mat4 RotationMatrix;
 glm::mat4 RotationX;
 glm::mat4 RotationY;
 glm::mat4 RotationZ;
+
+glm::mat4 TranslationMatrix =
+		glm::mat4(
+			1.0f, 0.0f, 0.0f, 0.0f,
+			0.0f, 1.0f, 0.0f, 0.0f,
+			0.0f, 0.0f, 1.0f, 0.0f,
+			0.0f, 0.0f, 0.0f, 1.0f
+		);
+
 
 double alpha = 0;
 double beta = 0;
@@ -71,6 +80,8 @@ float *tangentArray;
 
 float *vertexArrayPlane;
 float *vertexArrayRabbit;
+
+float *vertexArrayCube;
 
 int numVerts;
 int numVertsPlane;
@@ -93,11 +104,22 @@ GLuint tex_normal;
 GLuint tex_depth;
 GLuint background;
 
+void UpdateTranslationMatrix(float X, float Y, float Z) {
+
+	TranslationMatrix =
+		glm::mat4(
+			1.0f, 0.0f, 0.0f, 0,
+			0.0f, 1.0f, 0.0f, 0,
+			0.0f, 0.0f, 1.0f, 0,
+			X, Y, Z, 1.0f
+		);
+
+}
 
 Skeleton createSkeleton(Bone *root) {
 
 	Skeleton skeleton = Skeleton();
-	addBone(skeleton, root);
+	skeleton = addBone(skeleton, root);
 	return skeleton;
 
 }
@@ -416,7 +438,7 @@ return VBO;
 
 GLuint generateObjectBuffer2() {
 
-	GLuint numVertices = numVertsPlane + numVertsRabbit;
+	GLuint numVertices = numVertsPlane + numVertsRabbit + 12;
 	// Genderate 1 generic buffer object, called VBO
 	//planeVBO;
 	glGenBuffers(1, &planeVBO);
@@ -432,6 +454,9 @@ GLuint generateObjectBuffer2() {
 	//printf("vertex array: %i", vertexArray);
 	
 	glBufferSubData(GL_ARRAY_BUFFER, numVertsPlane * 3 * sizeof(GLfloat), numVertsRabbit * 3 * sizeof(GLfloat), vertexArrayRabbit);
+
+	//glBufferSubData(GL_ARRAY_BUFFER, (numVertsPlane * 3 * sizeof(GLfloat)) + (numVertsRabbit * 3 * sizeof(GLfloat)), 12 * 3 * sizeof(GLfloat), vertexArrayCube);
+
 	return planeVBO;
 }
 
@@ -484,13 +509,14 @@ void linkCurrentBuffertoShader(GLuint shaderProgramID){
 }
 
 void linkCurrentBuffertoShader2(GLuint shaderProgramID) {
-	GLuint numVertices = numVertsPlane + numVertsRabbit;
+	GLuint numVertices = numVertsPlane + numVertsRabbit + 12;
 	// find the location of the variables that we will be using in the shader program
 	GLuint positionID = glGetAttribLocation(shaderProgramID, "vPosition");
 	GLuint colorID = glGetAttribLocation(shaderProgramID, "vColor");
 	GLuint MatrixID = glGetUniformLocation(shaderProgramID, "MVP");
 	// Have to enable this
 	glEnableVertexAttribArray(positionID);
+	glTranslatef(0.0f, 0.0f, -6.0f);
 	// Tell it where to find the position data in the currently active buffer (at index positionID)
 	glVertexAttribPointer(positionID, 3, GL_FLOAT, GL_FALSE, 0, 0);
 	// Similarly, for the color data.
@@ -502,7 +528,7 @@ void linkCurrentBuffertoShader2(GLuint shaderProgramID) {
 			0.0f, 0.0f, 0.0f, 0.0f,
 			0.0f, 0.0f, 0.0f, 0.0f,
 			0.0f, 0.0f, 0.0f, 0.0f,
-			0.0f, -0.5f, 0.0f, -1.0f
+			0.0f, 0, 0.0f, 1.0f
 	);
 
 	int location = glGetUniformLocationARB(shaderProgramID, "perspectiveMat");
@@ -528,10 +554,10 @@ void linkCurrentBuffertoShader2(GLuint shaderProgramID) {
 }
 
 void renderRabbit() {
-	//glPushMatrix(); // save current modelview matrix (mostly saves camera transform)
-	glScalef(4, 4, 4);  //rescale model
+	//glScalef(4, 4, 4);  //rescale model
 
 	glDrawArrays(GL_TRIANGLES, 0, numVerts);//g_point_count);
+	
 }
 
 void display(){
@@ -548,13 +574,21 @@ void display(){
 	quaternion = glm::quat(glm::vec3(alpha, beta, gamma));
 	RotationMatrix = glm::toMat4(quaternion);
 
-	MVPmatrix = ProjectionMatrix * ViewMatrix * ModelMatrix * RotationMatrix;
 
+
+	UpdateTranslationMatrix(0,0.0f,0.0f);
+	glm::mat4 ModelViewMatrix = ViewMatrix * ModelMatrix;
+	ModelViewMatrix = TranslationMatrix * ModelViewMatrix;
+	MVPmatrix = ProjectionMatrix * ModelViewMatrix *  RotationMatrix;
+	//MVPmatrix *= TranslationMatrix;
 	
+	//glPushMatrix();
+	//glTranslatef(4, 4, 4);
 	glBindBuffer(GL_ARRAY_BUFFER, planeVBO);
+	//glTranslatef(0.0f, 0.0f, -6.0f);
 	linkCurrentBuffertoShader2(shaderProgramID);
 	renderRabbit();
-
+	//glPopMatrix();
 	
 	//glBindBuffer(GL_ARRAY_BUFFER, rabbitVBO);
 	//linkCurrentBuffertoShader2(shaderProgramID, numVertsRabbit);
@@ -610,6 +644,56 @@ void init()
 
 	};
 
+	GLfloat cube_vertices[] = {
+		-1.0f,-1.0f,-1.0f, // triangle 1 : begin
+		-1.0f,-1.0f, 1.0f,
+		-1.0f, 1.0f, 1.0f, // triangle 1 : end
+
+		1.0f, 1.0f,-1.0f, // triangle 2 : begin
+		-1.0f,-1.0f,-1.0f,
+		-1.0f, 1.0f,-1.0f, // triangle 2 : end
+
+		1.0f,-1.0f, 1.0f,
+		-1.0f,-1.0f,-1.0f,
+		1.0f,-1.0f,-1.0f,
+
+		1.0f, 1.0f,-1.0f,
+		1.0f,-1.0f,-1.0f,
+		-1.0f,-1.0f,-1.0f,
+
+		-1.0f,-1.0f,-1.0f,
+		-1.0f, 1.0f, 1.0f,
+		-1.0f, 1.0f,-1.0f,
+
+		1.0f,-1.0f, 1.0f,
+		-1.0f,-1.0f, 1.0f,
+		-1.0f,-1.0f,-1.0f,
+
+		-1.0f, 1.0f, 1.0f,
+		-1.0f,-1.0f, 1.0f,
+		1.0f,-1.0f, 1.0f,
+
+		1.0f, 1.0f, 1.0f,
+		1.0f,-1.0f,-1.0f,
+		1.0f, 1.0f,-1.0f,
+
+		1.0f,-1.0f,-1.0f,
+		1.0f, 1.0f, 1.0f,
+		1.0f,-1.0f, 1.0f,
+
+		1.0f, 1.0f, 1.0f,
+		1.0f, 1.0f,-1.0f,
+		-1.0f, 1.0f,-1.0f,
+
+		1.0f, 1.0f, 1.0f,
+		-1.0f, 1.0f,-1.0f,
+		-1.0f, 1.0f, 1.0f,
+
+		1.0f, 1.0f, 1.0f,
+		-1.0f, 1.0f, 1.0f,
+		1.0f,-1.0f, 1.0f
+	};
+
 	// Set up the shaders
 	shaderProgramID = CompileShaders("../diffuse.vs", "../diffuse.ps");
 
@@ -630,7 +714,8 @@ void init()
 	vertexArrayPlane = vertexArray;
 	generateObjectBuffer2();
 
-	numVerts = numVertsPlane + numVertsRabbit;
+	vertexArrayCube = vertices;
+	numVerts = numVertsPlane + numVertsRabbit + 12;
 
 }
 
@@ -642,12 +727,13 @@ void initGL()
 
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
-	gluPerspective(60, 1, 1, 1000);  //setup a perspective projection
+	gluPerspective(60, 1, 0.1, 100);  //setup a perspective projection
 
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
+	//glTranslatef(4,0,0);
 
-	gluLookAt(						//set up camera
+	gluLookAt(				//set up camera
 		0.0, 0.0, 5.0,		// eye position
 		0.0, 0.0, 0.0,		// lookat position
 		0.0, 1.0, 0.0		// up direction
@@ -660,12 +746,13 @@ void initGL()
 	);
 
 	ViewMatrix = glm::lookAt(
-		glm::vec3(20, 2, 3), // Camera is at (4,3,3), in World Space
+		glm::vec3(4, 3, 3), // Camera is at (4,3,3), in World Space
 		glm::vec3(0, 0, 0), // and looks at the origin
 		glm::vec3(0, 1, 0)  // Head is up (set to 0,-1,0 to look upside-down)
 	);
 
-	ModelMatrix = glm::mat4(1.0f);
+	//UpdateTranslationMatrix(4.0f, 0, 0);
+	ModelMatrix = glm::mat4(1.0f); //* TranslationMatrix;
 
 	ProjectionMatrix = glm::perspective(
 		glm::radians(90.0f),         // The horizontal Field of View, in degrees : the amount of "zoom". Think "camera lens". Usually between 90° (extra wide) and 30° (quite zoomed in)
@@ -851,8 +938,10 @@ void main(){
 	Bone *testBone = createBone("test", glm::mat4(1.0));
 	boneDumpTree(testBone, 1);
 	Skeleton skeleton = createSkeleton(testBone);
+	skeletonDumpTree(skeleton); 
 	//testBone = skeleton.rootBone;
-	//boneDumpTree(testBone, 1);
+	//printf("skeleton root: ");
+	//boneDumpTree(skeleton.rootBone, 1); 
 
 	// Set up your objects and shaders
 	init();

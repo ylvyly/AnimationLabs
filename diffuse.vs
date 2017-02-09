@@ -10,7 +10,7 @@ in vec2 Texcoords;
 in vec3 Tangent;
 
 in vec3 vPosition;
-in vec4 vColor; //color from vertex buffer object
+in vec3 vColor; //color from vertex buffer object
 
 out vec4 color;
 out vec2 pos;
@@ -22,7 +22,7 @@ void main()
 {
 	//vec4 test = identity[0];
 
-	gl_Position = perspectiveMat * vec4(vPosition.x, vPosition.y, vPosition.z, 1.0);
+	//gl_Position = perspectiveMat * vec4(vPosition.x, vPosition.y, vPosition.z, 1.0);
 	gl_Position = MVP * vec4(vPosition.x, vPosition.y, vPosition.z, 1.0);
 	color = vec4(vPosition.x, vPosition.y, vPosition.z, 1.0);//vColor;
 	pos = Texcoords;
